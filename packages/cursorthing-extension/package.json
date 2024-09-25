@@ -1,0 +1,53 @@
+{
+	"name": "cursorthing-extension",
+	"displayName": "cursorthing",
+	"version": "0.0.1",
+	"description": "Make the web multiplayer",
+	"author": "Jacob Coughenour. <me@jacobcoughenour.com>",
+	"scripts": {
+		"dev": "plasmo dev",
+		"build": "plasmo build",
+		"package": "plasmo package"
+	},
+	"dependencies": {
+		"cursorthing-client": "workspace:*",
+		"plasmo": "0.89.2",
+		"react": "18.2.0",
+		"react-dom": "18.2.0"
+	},
+	"devDependencies": {
+		"@ianvs/prettier-plugin-sort-imports": "4.1.1",
+		"@types/chrome": "0.0.258",
+		"@types/node": "20.11.5",
+		"@types/react": "18.2.48",
+		"@types/react-dom": "18.2.18",
+		"prettier": "^3.2.5",
+		"typescript": "5.3.3",
+		"svgo": "3.3.2"
+	},
+	"manifest": {
+		"host_permissions": [
+			"https://*/*"
+		]
+	},
+	"prettier": {
+		"printWidth": 80,
+		"tabWidth": 4,
+		"useTabs": true,
+		"plugins": [
+			"@ianvs/prettier-plugin-sort-imports"
+		],
+		"importOrder": [
+			"<BUILTIN_MODULES>",
+			"<THIRD_PARTY_MODULES>",
+			"",
+			"^@plasmo/(.*)$",
+			"",
+			"^@plasmohq/(.*)$",
+			"",
+			"^~(.*)$",
+			"",
+			"^[./]"
+		]
+	}
+}

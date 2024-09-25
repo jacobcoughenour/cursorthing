@@ -1,0 +1,14 @@
+{
+	"name": "cursorthing-client",
+	"version": "0.0.1",
+	"private": true,
+	"main": "./index.ts",
+	"types": "./index.ts",
+	"dependencies": {
+		"@trpc/client": "10.45.2"
+	},
+	"devDependencies": {
+		"@types/node": "18.15.12",
+		"typescript": "5.3.3"
+	}
+}
