@@ -5,7 +5,8 @@
 	"main": "./index.ts",
 	"types": "./index.ts",
 	"dependencies": {
-		"@trpc/client": "10.45.2"
+		"@trpc/client": "10.45.2",
+		"events": "^3.3.0"
 	},
 	"devDependencies": {
 		"@types/node": "18.15.12",

@@ -1,20 +1,17 @@
 {
 	"extends": "plasmo/templates/tsconfig.base",
-	"exclude": [
-	  "node_modules"
-	],
+	"exclude": ["node_modules"],
 	"include": [
-	  ".plasmo/index.d.ts",
-	  "./**/*.ts",
-	  "./**/*.tsx"
+		".plasmo/index.d.ts",
+		"./**/*.ts",
+		"./**/*.tsx",
+		"popup.jsx",
+		"background/index.js"
 	],
 	"compilerOptions": {
-	  "paths": {
-		"~*": [
-		  "./*"
-		]
-	  },
-	  "baseUrl": "."
+		"paths": {
+			"~*": ["./*"]
+		},
+		"baseUrl": "."
 	}
-  }
-  
+}

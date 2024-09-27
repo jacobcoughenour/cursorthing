@@ -1,7 +1,7 @@
 {
 	"name": "cursorthing-api",
 	"scripts": {
-		"dev": "nodemon --exec go run main.go --signal SIGTERM"
+		"dev": "nodemon --exec go run . --signal SIGTERM"
 	},
 	"devDependencies": {
 		"nodemon": "^2.0.15"

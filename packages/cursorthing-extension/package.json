@@ -10,6 +10,7 @@
 		"package": "plasmo package"
 	},
 	"dependencies": {
+		"@plasmohq/messaging": "^0.6.2",
 		"cursorthing-client": "workspace:*",
 		"plasmo": "0.89.2",
 		"react": "18.2.0",
@@ -21,9 +22,8 @@
 		"@types/node": "20.11.5",
 		"@types/react": "18.2.48",
 		"@types/react-dom": "18.2.18",
-		"prettier": "^3.2.5",
-		"typescript": "5.3.3",
-		"svgo": "3.3.2"
+		"svgo": "3.3.2",
+		"typescript": "5.3.3"
 	},
 	"manifest": {
 		"host_permissions": [

@@ -1,10 +1,7 @@
-import { hello } from "cursorthing-client";
 import { useState } from "react";
 
 function IndexPopup() {
 	const [data, setData] = useState("");
-
-	hello();
 
 	return (
 		<div
