@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"strconv"
 	"strings"
@@ -51,7 +52,8 @@ func (r Request) String() string {
 
 type CallRequest struct {
 	Request
-	call_id CallId
+	call_id  CallId
+	function string
 }
 
 type EmitRequest struct {
@@ -61,24 +63,78 @@ type EmitRequest struct {
 
 // note: this doesn't unmarshal json data
 func UnmarshalRequest(message string) (interface{}, error) {
-
 	req := Request{}
 
 	// check if the data is too large
 	if len(message) > MAX_MESSAGE_SIZE {
 		return req, fmt.Errorf("message too large")
 	}
-
-	// split the data into lines
-	lines := strings.Split(message, "\n")
-	if len(lines) < 2 {
-		return req, fmt.Errorf("invalid message")
+	if len(message) == 0 {
+		return req, fmt.Errorf("empty message")
 	}
 
-	// get the data
-	if len(lines) > 2 {
+	scanner := bufio.NewScanner(strings.NewReader(message))
+	scanner.Split(bufio.ScanLines)
+
+	// first line
+	if !scanner.Scan() {
+		return req, fmt.Errorf("missing verb")
+	}
+
+	// get the verb
+	verbStr := scanner.Text()
+	if verbStr == "CALL" {
+		req.verb = CALL
+	} else if verbStr == "EMIT" {
+		req.verb = EMIT
+	} else {
+		return req, fmt.Errorf("invalid verb")
+	}
+
+	// second line
+	if !scanner.Scan() {
+		if req.verb == CALL {
+			return req, fmt.Errorf("missing call id")
+		} else if req.verb == EMIT {
+			return req, fmt.Errorf("missing event name")
+		}
+	}
+
+	callId := CallId(0)
+	function := ""
+	event := ""
+	if req.verb == CALL {
+		// get call id
+		callIdStr := scanner.Text()
+		// try parsing as a uint16
+		callId, err := strconv.ParseUint(callIdStr, 10, 16)
+		if err != nil || callId > 65535 {
+			return req, fmt.Errorf("invalid call id")
+		}
+
+		// get the function name
+		if !scanner.Scan() {
+			return req, fmt.Errorf("missing function name")
+		}
+
+		function = scanner.Text()
+		if function == "" {
+			return req, fmt.Errorf("empty function name")
+		}
+
+	} else if req.verb == EMIT {
+		// get event
+		event = scanner.Text()
+		if event == "" {
+			return req, fmt.Errorf("empty event name")
+		}
+	}
+
+	// get optional data
+	if scanner.Scan() {
+
 		// get format
-		formatStr := lines[2]
+		formatStr := scanner.Text()
 		if formatStr == "JSON" {
 			req.format = JSON
 		} else if formatStr == "TEXT" {
@@ -87,36 +143,24 @@ func UnmarshalRequest(message string) (interface{}, error) {
 			return req, fmt.Errorf("invalid format")
 		}
 
-		if len(lines) > 3 {
+		// if there are more lines, then the data is present
+		if scanner.Scan() {
 			// collect the rest of the message as the data
-			req.data = strings.Join(lines[3:], "\n")
+			req.data = scanner.Text()
+			for scanner.Scan() {
+				req.data += "\n" + scanner.Text()
+			}
 		} else {
-			// format was specified without a trailing new line for data.
-			// if you want to send an empty string you need to specify the
-			// format as TEXT then have a new line and leave it blank.
-			return req, fmt.Errorf("missing data")
+			// we assume the data is an empty string
+			req.data = ""
 		}
+
 	}
 
-	// get the verb
-	verbStr := lines[0]
-	if verbStr == "CALL" {
-		req.verb = CALL
-		// get call id
-		callIdStr := lines[1]
-		// try parsing as a uint16
-		callId, err := strconv.ParseUint(callIdStr, 10, 16)
-		if err != nil || callId > 65535 {
-			return req, fmt.Errorf("invalid call id")
-		}
-		return interface{}(CallRequest{req, CallId(callId)}), nil
-
-	} else if verbStr == "EMIT" {
-		req.verb = EMIT
-		// get event
-		event := lines[1]
-		return interface{}(EmitRequest{req, event}), nil
+	if req.verb == CALL {
+		return interface{}(CallRequest{req, callId, function}), nil
 	}
-
-	return req, fmt.Errorf("invalid verb")
+	// else if req.verb == EMIT {
+	return interface{}(EmitRequest{req, event}), nil
+	// }
 }
