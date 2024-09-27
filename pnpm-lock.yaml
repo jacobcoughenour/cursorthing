@@ -35,6 +35,9 @@ importers:
       '@trpc/client':
         specifier: 10.45.2
         version: 10.45.2(@trpc/server@10.45.2)
+      events:
+        specifier: ^3.3.0
+        version: 3.3.0
     devDependencies:
       '@types/node':
         specifier: 18.15.12
@@ -76,9 +79,6 @@ importers:
       '@types/react-dom':
         specifier: 18.2.18
         version: 18.2.18
-      prettier:
-        specifier: ^3.2.5
-        version: 3.3.3
       svgo:
         specifier: 3.3.2
         version: 3.3.2
