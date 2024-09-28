@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"cursorthing-api/prism"
-	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-
-	"github.com/gorilla/websocket"
+	"net/url"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 )
 
 type Server struct {
@@ -18,133 +20,64 @@ func NewServer() *Server {
 }
 
 func (server *Server) ListenAndServe(port int) error {
-	if port == 0 {
-		return fmt.Errorf("API port is not set")
-	}
-	log.Println("Starting API on port", port)
-
 	p := prism.NewRouter()
 
+	// normal REST endpoint
 	p.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
 
+	// prism endpoints
+	p.HandlePrismFunc("join", joinHandler)
+	p.HandlePrismFunc("leave", leaveHandler)
+
 	p.ListenAndServe(port)
+
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	<-c
+	p.Close(context.Background())
 
 	return nil
 }
 
-func (server *Server) handleEvents() {
+func joinHandler(c *prism.Context) {
 
-}
-
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
-
-func (s *Server) socketHandler(w http.ResponseWriter, r *http.Request) {
-	// upgrade to a websocket connection
-	conn, err := upgrader.Upgrade(w, r, nil)
+	fullUrl, err := c.TextParam()
 	if err != nil {
-		log.Println("Failed to upgrade connection:", err)
+		c.Error(err)
 		return
 	}
 
-	// create client
-	client := &Client{
-		socket: conn,
-		send:   make(chan []byte),
+	norm, err := normalizeUrl(fullUrl)
+	if err != nil {
+		c.Error(err)
+		return
 	}
 
-	// reader goroutine
-	go func() {
-		defer func() {
-			// unregister client from all groups
-			for _, group := range s.groups {
-				group.unregister <- client
-			}
-			conn.Close()
-			close(client.send)
-		}()
-
-		for {
-			_, b, err := conn.ReadMessage()
-			if err != nil {
-				// unregister client from all groups
-				for _, group := range s.groups {
-					group.unregister <- client
-					// s.deleteGroupIfEmpty(key)
-				}
-				conn.Close()
-				break
-			}
-
-			log.Println("Received message:", string(b))
-
-			// json parse message
-			var msg map[string]interface{}
-			err = json.Unmarshal(b, &msg)
-			if err != nil {
-				log.Println("Failed to unmarshal message:", err)
-				continue
-			}
-
-			// handle message
-			switch msg["operation"] {
-			case "group/join":
-				{
-					// groupString := msg["url"].(string)
-					// s.getOrCreateGroup(topicString).register <- client
-				}
-			case "group/leave":
-				{
-					topicString := msg["url"].(string)
-					topic, ok := s.groups[topicString]
-					if !ok {
-						log.Println("Failed to get topic group:", topicString)
-						continue
-					}
-					topic.unregister <- client
-					// s.deleteGroupIfEmpty(topicString)
-				}
-			}
-		}
-	}()
-
-	// writer goroutine
-	go func() {
-		defer conn.Close()
-		for {
-			message, ok := <-client.send
-			if !ok {
-				conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-			conn.WriteMessage(websocket.TextMessage, message)
-		}
-	}()
-}
-
-func (server *Server) normalizeUrl(url string) string {
 	// todo
-	return url
+
+	c.ResponseText(norm)
 }
 
-func (server *Server) getOrCreateTopic(url string) *Group {
-	if _, ok := server.groups[url]; !ok {
-		server.groups[url] = NewGroup(server, url)
-		fmt.Println("created new topic group:", url)
-	}
-	return server.groups[url]
+func leaveHandler(c *prism.Context) {
 }
 
-func (s *Server) deleteGroupIfEmpty(url string) {
-	group, ok := s.groups[url]
-	if ok && len(group.clients) == 0 {
-		delete(s.groups, url)
+func normalizeUrl(fullUrl string) (string, error) {
+
+	u, err := url.Parse(fullUrl)
+	if err != nil {
+		return "", err
 	}
+
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("scheme must be https")
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("host is required")
+	}
+	u.Host = strings.TrimPrefix(u.Host, "www.")
+
+	return fmt.Sprintf("%s/%s", u.Host, strings.TrimPrefix(u.Path, "/")), nil
 }

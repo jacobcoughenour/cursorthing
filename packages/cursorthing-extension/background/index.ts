@@ -2,8 +2,9 @@ import { CursorThingClient } from "cursorthing-client";
 
 const client = new CursorThingClient("localhost");
 
-client.on("connect", () => {
-	console.log("Connected to server!");
-});
+// todo should debounce navigation events to avoid spamming the server when
+// the client is getting redirected around
+
+client.join("https://google.com");
 
 export {};

@@ -1,25 +1,17 @@
 import EventEmitter from "events";
+import { PrismClient } from "./prism";
 
 export class CursorThingClient extends EventEmitter {
-	private _ws: WebSocket;
+	private _prism: PrismClient;
 
 	constructor(endpoint: string) {
 		super();
 
-		// todo only establish connection when content script when a group is joined
-		this._ws = new WebSocket(`ws://${endpoint}:8080`);
+		this._prism = new PrismClient(endpoint);
+	}
 
-		this._ws.onopen = () => {
-			this.emit("connect");
-		};
-		this._ws.onmessage = (event) => {
-			this.emit("message", JSON.parse(event.data));
-		};
-		this._ws.onclose = () => {
-			this.emit("disconnect");
-		};
-		this._ws.onerror = (error) => {
-			this.emit("error", error);
-		};
+	public async join(url: string) {
+		const roomId = await this._prism.call("join", url);
+		console.log(`Joined room ${roomId}`);
 	}
 }

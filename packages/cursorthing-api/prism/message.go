@@ -10,7 +10,9 @@ import (
 const MAX_MESSAGE_SIZE = 4096
 
 type DataFormat int
-type CallId uint16
+type CallId uint32
+
+const MAX_CALL_ID = 0xFFFFFFFF
 
 const (
 	VOID DataFormat = iota
@@ -25,12 +27,12 @@ const (
 	EMIT
 )
 
-func MakeResponse(call_id CallId, format DataFormat, data string) string {
+func MakeResponse(call_id CallId, format DataFormat, data *string) string {
 	switch format {
 	case JSON:
-		return fmt.Sprintf("RES\n%d\nJSON\n%s", call_id, data)
+		return fmt.Sprintf("RES\n%d\nJSON\n%s", call_id, *data)
 	case TEXT:
-		return fmt.Sprintf("RES\n%d\nTEXT\n%s", call_id, data)
+		return fmt.Sprintf("RES\n%d\nTEXT\n%s", call_id, *data)
 	default:
 		return fmt.Sprintf("RES\n%d", call_id)
 	}
@@ -62,8 +64,10 @@ type EmitRequest struct {
 }
 
 // note: this doesn't unmarshal json data
-func UnmarshalRequest(message string) (interface{}, error) {
+func UnmarshalRequest(data []byte) (interface{}, error) {
 	req := Request{}
+
+	message := string(data)
 
 	// check if the data is too large
 	if len(message) > MAX_MESSAGE_SIZE {
@@ -106,11 +110,12 @@ func UnmarshalRequest(message string) (interface{}, error) {
 	if req.verb == CALL {
 		// get call id
 		callIdStr := scanner.Text()
-		// try parsing as a uint16
-		callId, err := strconv.ParseUint(callIdStr, 10, 16)
-		if err != nil || callId > 65535 {
+		// try parsing as a uint32
+		callIdInt, err := strconv.ParseUint(callIdStr, 10, 32)
+		if err != nil || callIdInt > MAX_CALL_ID {
 			return req, fmt.Errorf("invalid call id")
 		}
+		callId = CallId(callIdInt)
 
 		// get the function name
 		if !scanner.Scan() {
