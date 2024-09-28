@@ -1,4 +1,6 @@
 
+PRISM
+Presence Realtime Interaction Server Messaging
 
 Make function calls to the server in the following format:
 ```

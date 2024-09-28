@@ -1,41 +1,76 @@
-package main
+package prism
 
 import (
-	"cursorthing-api/prism"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/rs/cors"
 )
 
-type Server struct {
+// a wrapper around the gorilla/mux router
+// to implement the prism protocol
+type PrismRouter struct {
+	*mux.Router
+	groups map[string]*PrismGroup
 }
 
-func NewServer() *Server {
-	return &Server{}
+func NewRouter() *PrismRouter {
+	return &PrismRouter{
+		mux.NewRouter(),
+		make(map[string]*PrismGroup),
+	}
 }
 
-func (server *Server) ListenAndServe(port int) error {
+func (s *PrismRouter) ListenAndServe(port int) error {
 	if port == 0 {
 		return fmt.Errorf("API port is not set")
 	}
 	log.Println("Starting API on port", port)
 
-	p := prism.NewRouter()
+	s.HandleFunc("/ws", s.socketHandler)
 
-	p.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE"},
 	})
 
-	p.ListenAndServe(port)
+	http.ListenAndServe(fmt.Sprintf(":%d", port), c.Handler(s))
 
 	return nil
 }
 
-func (server *Server) handleEvents() {
+type PrismClient struct {
+	socket *websocket.Conn
+	send   chan []byte
+}
 
+type PrismGroup struct {
+	// name of the group
+	name string
+	// reference to the parent router
+	router *PrismRouter
+	// what clients are in this group
+	clients map[*PrismClient]bool
+	// channel to broadcast messages to all clients
+	broadcast chan []byte
+	// channels to register and unregister clients
+	register   chan *PrismClient
+	unregister chan *PrismClient
+}
+
+func addGroup(router *PrismRouter, name string) *PrismGroup {
+	return &PrismGroup{
+		name:       name,
+		router:     router,
+		clients:    make(map[*PrismClient]bool),
+		broadcast:  make(chan []byte),
+		register:   make(chan *PrismClient),
+		unregister: make(chan *PrismClient),
+	}
 }
 
 var upgrader = websocket.Upgrader{
@@ -46,7 +81,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func (s *Server) socketHandler(w http.ResponseWriter, r *http.Request) {
+func (s *PrismRouter) socketHandler(w http.ResponseWriter, r *http.Request) {
 	// upgrade to a websocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -55,7 +90,7 @@ func (s *Server) socketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create client
-	client := &Client{
+	client := &PrismClient{
 		socket: conn,
 		send:   make(chan []byte),
 	}
@@ -94,24 +129,7 @@ func (s *Server) socketHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// handle message
-			switch msg["operation"] {
-			case "group/join":
-				{
-					// groupString := msg["url"].(string)
-					// s.getOrCreateGroup(topicString).register <- client
-				}
-			case "group/leave":
-				{
-					topicString := msg["url"].(string)
-					topic, ok := s.groups[topicString]
-					if !ok {
-						log.Println("Failed to get topic group:", topicString)
-						continue
-					}
-					topic.unregister <- client
-					// s.deleteGroupIfEmpty(topicString)
-				}
-			}
+			// todo
 		}
 	}()
 
@@ -127,24 +145,4 @@ func (s *Server) socketHandler(w http.ResponseWriter, r *http.Request) {
 			conn.WriteMessage(websocket.TextMessage, message)
 		}
 	}()
-}
-
-func (server *Server) normalizeUrl(url string) string {
-	// todo
-	return url
-}
-
-func (server *Server) getOrCreateTopic(url string) *Group {
-	if _, ok := server.groups[url]; !ok {
-		server.groups[url] = NewGroup(server, url)
-		fmt.Println("created new topic group:", url)
-	}
-	return server.groups[url]
-}
-
-func (s *Server) deleteGroupIfEmpty(url string) {
-	group, ok := s.groups[url]
-	if ok && len(group.clients) == 0 {
-		delete(s.groups, url)
-	}
 }
