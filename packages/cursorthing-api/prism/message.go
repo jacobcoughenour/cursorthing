@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// this is in character length
 const MAX_MESSAGE_SIZE = 4096
 
 type DataFormat int
@@ -27,19 +28,55 @@ const (
 	EMIT
 )
 
-func MakeResponse(call_id CallId, format DataFormat, data *string) string {
+func MakeResponse(call_id CallId, format DataFormat, data *string) (string, error) {
+	if format != VOID && data == nil {
+		return "", fmt.Errorf("missing data")
+	}
+	message := ""
 	switch format {
 	case JSON:
-		return fmt.Sprintf("RES\n%d\nJSON\n%s", call_id, *data)
+		message = fmt.Sprintf("RES\n%d\nJSON\n%s", call_id, *data)
 	case TEXT:
-		return fmt.Sprintf("RES\n%d\nTEXT\n%s", call_id, *data)
+		message = fmt.Sprintf("RES\n%d\nTEXT\n%s", call_id, *data)
 	default:
-		return fmt.Sprintf("RES\n%d", call_id)
+		message = fmt.Sprintf("RES\n%d", call_id)
 	}
+	if len(message) > MAX_MESSAGE_SIZE {
+		return "", fmt.Errorf("message too large")
+	}
+	return message, nil
 }
 
-func MakeErrorResponse(call_id CallId, err string) string {
-	return fmt.Sprintf("ERR\n%d\n%s", call_id, err)
+func MakeErrorResponse(call_id CallId, err string) (string, error) {
+	if len(err) == 0 {
+		return "", fmt.Errorf("empty error message")
+	}
+	message := fmt.Sprintf("ERR\n%d\n%s", call_id, err)
+	if len(message) > MAX_MESSAGE_SIZE {
+		return "", fmt.Errorf("message too large")
+	}
+	return message, nil
+}
+
+func MakeCastMessage(topic string, format DataFormat, data *string) (string, error) {
+	if format != VOID && data == nil {
+		return "", fmt.Errorf("missing data")
+	} else if format == VOID && data != nil {
+		return "", fmt.Errorf("data present but format is void")
+	}
+	message := ""
+	switch format {
+	case JSON:
+		message = fmt.Sprintf("CAST\n%s\nJSON\n%s", topic, *data)
+	case TEXT:
+		message = fmt.Sprintf("CAST\n%s\nTEXT\n%s", topic, *data)
+	default:
+		message = fmt.Sprintf("CAST\n%s", topic)
+	}
+	if len(message) > MAX_MESSAGE_SIZE {
+		return "", fmt.Errorf("message too large")
+	}
+	return message, nil
 }
 
 type Request struct {
@@ -71,10 +108,10 @@ func UnmarshalRequest(data []byte) (interface{}, error) {
 
 	// check if the data is too large
 	if len(message) > MAX_MESSAGE_SIZE {
-		return req, fmt.Errorf("message too large")
+		return nil, fmt.Errorf("message too large")
 	}
 	if len(message) == 0 {
-		return req, fmt.Errorf("empty message")
+		return nil, fmt.Errorf("empty message")
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(message))
@@ -82,7 +119,7 @@ func UnmarshalRequest(data []byte) (interface{}, error) {
 
 	// first line
 	if !scanner.Scan() {
-		return req, fmt.Errorf("missing verb")
+		return nil, fmt.Errorf("missing verb")
 	}
 
 	// get the verb
@@ -92,15 +129,15 @@ func UnmarshalRequest(data []byte) (interface{}, error) {
 	} else if verbStr == "EMIT" {
 		req.verb = EMIT
 	} else {
-		return req, fmt.Errorf("invalid verb")
+		return nil, fmt.Errorf("invalid verb")
 	}
 
 	// second line
 	if !scanner.Scan() {
 		if req.verb == CALL {
-			return req, fmt.Errorf("missing call id")
+			return nil, fmt.Errorf("missing call id")
 		} else if req.verb == EMIT {
-			return req, fmt.Errorf("missing event name")
+			return nil, fmt.Errorf("missing event name")
 		}
 	}
 
@@ -113,25 +150,25 @@ func UnmarshalRequest(data []byte) (interface{}, error) {
 		// try parsing as a uint32
 		callIdInt, err := strconv.ParseUint(callIdStr, 10, 32)
 		if err != nil || callIdInt > MAX_CALL_ID {
-			return req, fmt.Errorf("invalid call id")
+			return nil, fmt.Errorf("invalid call id")
 		}
 		callId = CallId(callIdInt)
 
 		// get the function name
 		if !scanner.Scan() {
-			return req, fmt.Errorf("missing function name")
+			return nil, fmt.Errorf("missing function name")
 		}
 
 		function = scanner.Text()
 		if function == "" {
-			return req, fmt.Errorf("empty function name")
+			return nil, fmt.Errorf("empty function name")
 		}
 
 	} else if req.verb == EMIT {
 		// get event
 		event = scanner.Text()
 		if event == "" {
-			return req, fmt.Errorf("empty event name")
+			return nil, fmt.Errorf("empty event name")
 		}
 	}
 
@@ -145,7 +182,7 @@ func UnmarshalRequest(data []byte) (interface{}, error) {
 		} else if formatStr == "TEXT" {
 			req.format = TEXT
 		} else {
-			return req, fmt.Errorf("invalid format")
+			return nil, fmt.Errorf("invalid format")
 		}
 
 		// if there are more lines, then the data is present
