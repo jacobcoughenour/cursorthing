@@ -5,11 +5,13 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Launch Agent",
+			"name": "Launch Server",
 			"type": "go",
 			"request": "launch",
 			"mode": "auto",
-			"program": "${workspaceFolder}/packages/cursorthing-api"
+			"program": "${workspaceFolder}/packages/cursorthing-api",
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen"
 		}
 	]
 }

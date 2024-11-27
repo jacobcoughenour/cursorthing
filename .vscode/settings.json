@@ -1,12 +1,12 @@
 {
 	"files.exclude": {
-		"**/.git": true,
-		"**/.DS_Store": true,
-		"**/node_modules": true,
-		"**/build": true,
-		"**/dist": true,
-		"**/.turbo": true,
-		"**/go.sum": true,
-		"**/.plasmo": true
+		"**/.git": false,
+		"**/.DS_Store": false,
+		"**/node_modules": false,
+		"**/build": false,
+		"**/dist": false,
+		"**/.turbo": false,
+		"**/go.sum": false,
+		"**/.plasmo": false
 	}
 }

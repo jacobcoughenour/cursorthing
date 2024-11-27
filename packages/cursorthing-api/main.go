@@ -1,10 +1,15 @@
 package main
 
 import (
-	"log"
+	"context"
+	"fmt"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 
 	"github.com/centrifugal/centrifuge"
+	"github.com/charmbracelet/log"
 )
 
 func auth(h http.Handler) http.Handler {
@@ -26,20 +31,48 @@ func auth(h http.Handler) http.Handler {
 
 func main() {
 
-	node, err := centrifuge.New(centrifuge.Config{})
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.DebugLevel)
+
+	node, err := centrifuge.New(centrifuge.Config{
+		LogLevel: centrifuge.LogLevelDebug,
+		LogHandler: func(e centrifuge.LogEntry) {
+			if e.Level == centrifuge.LogLevelError {
+				log.Error("[CF]", e.Message, e.Fields)
+				return
+			}
+			if e.Level == centrifuge.LogLevelInfo {
+				log.Info("[CF]", e.Message, e.Fields)
+				return
+			}
+			if e.Level == centrifuge.LogLevelWarn {
+				log.Warn("[CF]", e.Message, e.Fields)
+				return
+			}
+			log.Debug("[CF]", e.Message, e.Fields)
+		},
+	})
 	if err != nil {
 		log.Fatal(err)
 		panic(err)
 	}
 
+	node.OnConnecting(func(ctx context.Context, e centrifuge.ConnectEvent) (centrifuge.ConnectReply, error) {
+		return centrifuge.ConnectReply{
+			Credentials: &centrifuge.Credentials{
+				UserID: "",
+			},
+		}, nil
+	})
+
 	node.OnConnect(func(client *centrifuge.Client) {
 
 		transportName := client.Transport().Name()
 		transportProto := client.Transport().Protocol()
-		log.Printf("client connected via %s (%s)", transportName, transportProto)
+		log.Infof("client connected via %s (%s)", transportName, transportProto)
 
 		client.OnSubscribe(func(e centrifuge.SubscribeEvent, cb centrifuge.SubscribeCallback) {
-			log.Printf("client subscribed to channel %s", e.Channel)
+			log.Infof("client subscribed to channel %s", e.Channel)
 
 			// todo we can validate the url here and if it's not normalized we reject. The other way to do it is to somehow redirect the client to the normalized url but i don't know if that is possible.
 
@@ -47,12 +80,12 @@ func main() {
 		})
 
 		client.OnPublish(func(e centrifuge.PublishEvent, cb centrifuge.PublishCallback) {
-			log.Printf("client published to channel %s", e.Channel)
+			log.Infof("client published to channel %s", e.Channel)
 			cb(centrifuge.PublishReply{}, nil)
 		})
 
 		client.OnDisconnect(func(e centrifuge.DisconnectEvent) {
-			log.Printf("client disconnected")
+			log.Info("client disconnected")
 		})
 	})
 
@@ -63,8 +96,38 @@ func main() {
 
 	// create http server
 
-	wsHandler := centrifuge.NewWebsocketHandler(node, centrifuge.WebsocketConfig{})
+	wsHandler := centrifuge.NewWebsocketHandler(node, centrifuge.WebsocketConfig{
+		CheckOrigin: func(r *http.Request) bool {
+			// allow any origin
+			return true
+		},
+	})
 	http.Handle("/connection/websocket", auth(wsHandler))
+
+	http.Handle("/normalize", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		slug := r.FormValue("url")
+
+		u, err := url.Parse(slug)
+		if err != nil {
+			http.Error(w, "invalid url", http.StatusBadRequest)
+			return
+		}
+
+		if u.Scheme != "https" {
+			http.Error(w, "scheme must be https", http.StatusBadRequest)
+			return
+		}
+		if u.Host == "" {
+			http.Error(w, "missing host", http.StatusBadRequest)
+			return
+		}
+		u.Host = strings.TrimPrefix(u.Host, "www.")
+
+		w.Write([]byte(fmt.Sprintf("%s/%s", u.Host, strings.TrimPrefix(u.Path, "/"))))
+	}))
 
 	log.Printf("starting server on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
