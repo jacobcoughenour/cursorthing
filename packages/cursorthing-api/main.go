@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 
 	"github.com/centrifugal/centrifuge"
 	"github.com/charmbracelet/log"
@@ -104,30 +101,30 @@ func main() {
 	})
 	http.Handle("/connection/websocket", auth(wsHandler))
 
-	http.Handle("/normalize", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// http.Handle("/normalize", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+	// 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-		slug := r.FormValue("url")
+	// 	slug := r.FormValue("url")
 
-		u, err := url.Parse(slug)
-		if err != nil {
-			http.Error(w, "invalid url", http.StatusBadRequest)
-			return
-		}
+	// 	u, err := url.Parse(slug)
+	// 	if err != nil {
+	// 		http.Error(w, "invalid url", http.StatusBadRequest)
+	// 		return
+	// 	}
 
-		if u.Scheme != "https" {
-			http.Error(w, "scheme must be https", http.StatusBadRequest)
-			return
-		}
-		if u.Host == "" {
-			http.Error(w, "missing host", http.StatusBadRequest)
-			return
-		}
-		u.Host = strings.TrimPrefix(u.Host, "www.")
+	// 	if u.Scheme != "https" {
+	// 		http.Error(w, "scheme must be https", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// 	if u.Host == "" {
+	// 		http.Error(w, "missing host", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// 	u.Host = strings.TrimPrefix(u.Host, "www.")
 
-		w.Write([]byte(fmt.Sprintf("%s/%s", u.Host, strings.TrimPrefix(u.Path, "/"))))
-	}))
+	// 	w.Write([]byte(fmt.Sprintf("%s/%s", u.Host, strings.TrimPrefix(u.Path, "/"))))
+	// }))
 
 	log.Printf("starting server on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
